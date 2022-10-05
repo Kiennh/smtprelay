@@ -26,6 +26,7 @@ import (
 	"net"
 	"net/smtp"
 	"net/textproto"
+	"regexp"
 	"strings"
 )
 
@@ -324,6 +325,9 @@ func SendMail(r *Remote, from string, to []string, msg []byte) error {
 	if r.Sender != "" {
 		from = r.Sender
 	}
+	var re = regexp.MustCompile(`From:(.*)<(.*)>`)
+	s := re.ReplaceAllString(string(msg), fmt.Sprintf("From: $1 <%s>", from))
+	msg = []byte(s)
 
 	if err := validateLine(from); err != nil {
 		return err

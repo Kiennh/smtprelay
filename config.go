@@ -45,20 +45,22 @@ var (
 	allowedUsers     = flagset.String("allowed_users", "", "Path to file with valid users/passwords")
 	command          = flagset.String("command", "", "Path to pipe command")
 	remotesStr       = flagset.String("remotes", "", "Outgoing SMTP servers")
+	disAllowBody     = flagset.String("disAllowBody", "", "disAllowBody keywords")
 
 	// additional flags
 	_           = flagset.String("config", "", "Path to config file (ini format)")
 	versionInfo = flagset.Bool("version", false, "Show version information")
 
 	// internal
-	listenAddrs       = []protoAddr{}
-	readTimeout       time.Duration
-	writeTimeout      time.Duration
-	dataTimeout       time.Duration
-	allowedNets       = []*net.IPNet{}
-	allowedSender     *regexp.Regexp
-	allowedRecipients *regexp.Regexp
-	remotes           = []*Remote{}
+	listenAddrs          = []protoAddr{}
+	readTimeout          time.Duration
+	writeTimeout         time.Duration
+	dataTimeout          time.Duration
+	allowedNets          = []*net.IPNet{}
+	allowedSender        *regexp.Regexp
+	allowedRecipients    *regexp.Regexp
+	remotes              = []*Remote{}
+	disAllowBodyKeywords = []string{}
 )
 
 func localAuthRequired() bool {
@@ -90,6 +92,10 @@ func setupAllowedNetworks() {
 func setupAllowedPatterns() {
 	var err error
 
+	if *disAllowBody != "" {
+		disAllowBodyKeywords = strings.Split(*disAllowBody, ",")
+	}
+
 	if *allowedSenderStr != "" {
 		allowedSender, err = regexp.Compile(*allowedSenderStr)
 		if err != nil {
@@ -118,7 +124,7 @@ func setupRemotes() {
 			if err != nil {
 				logger.Fatal(fmt.Sprintf("error parsing url: '%s': %v", remoteURL, err))
 			}
-
+			logger.Info("Remote:" + remoteURL)
 			remotes = append(remotes, r)
 		}
 	}

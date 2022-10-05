@@ -30,3 +30,15 @@ device which produces mail.
 * Forwards all mail to a smarthost (any SMTP server)
 * Small codebase
 * IPv6 support
+
+## Add features
+* Forward mail to all smtp server to Forward mail to first alive smtp server 
+* Reject email by filer keywords on body 
+* Force replace From email address
+* Log error or reject email 
+
+### Build
+
+```
+make build
+```

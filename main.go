@@ -3,11 +3,13 @@ package main
 import (
 	"bytes"
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/textproto"
 	"os"
 	"os/exec"
 	"os/signal"
+	"regexp"
 	"strings"
 	"syscall"
 
@@ -151,16 +153,35 @@ func authChecker(peer smtpd.Peer, username string, password string) error {
 }
 
 func mailHandler(peer smtpd.Peer, env smtpd.Envelope) error {
+	err := innerMailHandler(peer, env)
+	logger := log.WithFields(logrus.Fields{
+		"from": env.Sender,
+		"to":   env.Recipients,
+		"uuid": generateUUID(),
+	})
+	if err != nil {
+		logger.Error(string(env.Data))
+	}
+	return err
+}
+
+func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope) error {
 	peerIP := ""
 	if addr, ok := peer.Addr.(*net.TCPAddr); ok {
 		peerIP = addr.IP.String()
 	}
-
+	var re = regexp.MustCompile(`From:(.*)<(.*)>`)
+	s := re.FindStringSubmatch(string(env.Data))
+	team := ""
+	if len(s) > 0 {
+		team = s[0]
+	}
 	logger := log.WithFields(logrus.Fields{
-		"from": env.Sender,
-		"to":   env.Recipients,
-		"peer": peerIP,
-		"uuid": generateUUID(),
+		"from":     env.Sender,
+		"to":       env.Recipients,
+		"peer":     peerIP,
+		"uuid":     generateUUID(),
+		"fromTeam": team,
 	})
 
 	if *remotesStr == "" && *command == "" {
@@ -190,10 +211,18 @@ func mailHandler(peer smtpd.Peer, env smtpd.Envelope) error {
 		cmdLogger.Info("pipe command successful: " + stdout.String())
 	}
 
+	var errAll error
+
 	for _, remote := range remotes {
 		logger = logger.WithField("host", remote.Addr)
-		logger.Info("delivering mail from peer using smarthost")
-
+		logger.Info("delivering mail from peer using smarthost: " + remote.Sender)
+		if len(disAllowBodyKeywords) > 0 {
+			for _, kw := range disAllowBodyKeywords {
+				if strings.Contains(strings.ToLower(string(env.Data)), kw) {
+					return fmt.Errorf("Refuse by keyword %s\n", kw)
+				}
+			}
+		}
 		err := SendMail(
 			remote,
 			env.Sender,
@@ -218,13 +247,15 @@ func mailHandler(peer smtpd.Peer, env smtpd.Envelope) error {
 					Error("delivery failed")
 			}
 
-			return smtpError
+			errAll = smtpError
+			continue
 		}
 
 		logger.Debug("delivery successful")
+		break
 	}
 
-	return nil
+	return errAll
 }
 
 func generateUUID() string {

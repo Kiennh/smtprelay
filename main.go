@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"net/textproto"
@@ -10,12 +11,15 @@ import (
 	"os/exec"
 	"os/signal"
 	"regexp"
+	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/chrj/smtpd"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
+	"github.com/go-telegram-bot-api/telegram-bot-api"
 )
 
 func connectionChecker(peer smtpd.Peer) error {
@@ -153,16 +157,33 @@ func authChecker(peer smtpd.Peer, username string, password string) error {
 }
 
 func mailHandler(peer smtpd.Peer, env smtpd.Envelope) error {
-	err := innerMailHandler(peer, env)
 	logger := log.WithFields(logrus.Fields{
 		"from": env.Sender,
 		"to":   env.Recipients,
 		"uuid": generateUUID(),
 	})
+	err := innerMailHandlerWithTimeout(peer, env)
 	if err != nil {
 		logger.Error(string(env.Data))
+		erri := sendAlert(fmt.Sprintf("Email %s %s failed", env.Sender, env.Recipients))
+		if erri != nil {
+			log.Error(erri)
+		}
 	}
 	return err
+}
+
+func innerMailHandlerWithTimeout(peer smtpd.Peer, env smtpd.Envelope) error {
+	result := make(chan error, 1)
+	go func() {
+		result <- innerMailHandler(peer, env)
+	}()
+	select {
+	case <-time.After(10 * time.Second):
+		return errors.New("timed out")
+	case result := <-result:
+		return result
+	}
 }
 
 func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope) error {
@@ -251,6 +272,10 @@ func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope) error {
 			continue
 		}
 
+		erri := sendAlert(fmt.Sprintf("Sending mail %s %s", env.Sender, env.Recipients))
+		if erri != nil {
+			logger.Error(erri)
+		}
 		logger.Debug("delivery successful")
 		break
 	}
@@ -411,6 +436,23 @@ func main() {
 	}
 
 	log.Debug("done")
+}
+
+func sendAlert(message string) error {
+	bot, err := tgbotapi.NewBotAPI(telegramToken)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	bot.Debug = false
+	id, err := strconv.ParseInt(telegramChatId, 10, 64)
+	if err != nil {
+		return err
+	}
+	msg := tgbotapi.NewMessage(id, message)
+
+	_, err = bot.Send(msg)
+	return err
 }
 
 func handleSignals() {

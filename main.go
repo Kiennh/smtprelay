@@ -17,9 +17,10 @@ import (
 	"time"
 
 	"github.com/chrj/smtpd"
-	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 	"github.com/go-telegram-bot-api/telegram-bot-api"
+	"github.com/google/uuid"
+	"github.com/jhillyerd/enmime"
+	"github.com/sirupsen/logrus"
 )
 
 func connectionChecker(peer smtpd.Peer) error {
@@ -157,15 +158,28 @@ func authChecker(peer smtpd.Peer, username string, password string) error {
 }
 
 func mailHandler(peer smtpd.Peer, env smtpd.Envelope) error {
+	r := bytes.NewReader(env.Data)
+	uid := generateUUID()
 	logger := log.WithFields(logrus.Fields{
 		"from": env.Sender,
 		"to":   env.Recipients,
-		"uuid": generateUUID(),
+		"uuid": uid,
 	})
-	err := innerMailHandlerWithTimeout(peer, env)
+	m, err := enmime.ReadEnvelope(r)
 	if err != nil {
-		logger.Error(string(env.Data))
-		erri := sendAlert(fmt.Sprintf("Email %s %s failed", env.Sender, env.Recipients))
+		logger.Info(err)
+	}
+	subject := ""
+	body := ""
+	if m != nil {
+		subject = m.GetHeader("Subject")
+		body = m.Text
+	}
+	err = innerMailHandlerWithTimeout(peer, env, uid, subject, body)
+	if err != nil {
+		logger.Error(body, "-- Errors:", err)
+
+		erri := sendAlert(fmt.Sprintf("Email %s %s %s failed", env.Sender, env.Recipients, subject))
 		if erri != nil {
 			log.Error(erri)
 		}
@@ -173,10 +187,10 @@ func mailHandler(peer smtpd.Peer, env smtpd.Envelope) error {
 	return err
 }
 
-func innerMailHandlerWithTimeout(peer smtpd.Peer, env smtpd.Envelope) error {
+func innerMailHandlerWithTimeout(peer smtpd.Peer, env smtpd.Envelope, uid, subject string, body string) error {
 	result := make(chan error, 1)
 	go func() {
-		result <- innerMailHandler(peer, env)
+		result <- innerMailHandler(peer, env, uid, subject, body)
 	}()
 	select {
 	case <-time.After(10 * time.Second):
@@ -186,7 +200,7 @@ func innerMailHandlerWithTimeout(peer smtpd.Peer, env smtpd.Envelope) error {
 	}
 }
 
-func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope) error {
+func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope, uid, subject string, body string) error {
 	peerIP := ""
 	if addr, ok := peer.Addr.(*net.TCPAddr); ok {
 		peerIP = addr.IP.String()
@@ -201,8 +215,9 @@ func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope) error {
 		"from":     env.Sender,
 		"to":       env.Recipients,
 		"peer":     peerIP,
-		"uuid":     generateUUID(),
+		"uuid":     uid,
 		"fromTeam": team,
+		"subject":  subject,
 	})
 
 	if *remotesStr == "" && *command == "" {
@@ -236,7 +251,6 @@ func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope) error {
 
 	for _, remote := range remotes {
 		logger = logger.WithField("host", remote.Addr)
-		logger.Info("delivering mail from peer using smarthost: " + remote.Sender)
 		if len(disAllowBodyKeywords) > 0 {
 			for _, kw := range disAllowBodyKeywords {
 				if strings.Contains(strings.ToLower(string(env.Data)), kw) {
@@ -272,11 +286,11 @@ func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope) error {
 			continue
 		}
 
-		erri := sendAlert(fmt.Sprintf("Sending mail %s %s", env.Sender, env.Recipients))
+		erri := sendAlert(fmt.Sprintf("Sending mail %s %s %s", env.Sender, env.Recipients, subject))
 		if erri != nil {
 			logger.Error(erri)
 		}
-		logger.Debug("delivery successful")
+		logger.Info(body)
 		break
 	}
 
@@ -439,6 +453,9 @@ func main() {
 }
 
 func sendAlert(message string) error {
+	if len(message) > 2048 {
+		message = message[0:2048]
+	}
 	bot, err := tgbotapi.NewBotAPI(telegramToken)
 	if err != nil {
 		log.Panic(err)

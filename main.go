@@ -175,11 +175,11 @@ func mailHandler(peer smtpd.Peer, env smtpd.Envelope) error {
 		subject = m.GetHeader("Subject")
 		body = m.Text
 	}
-	err = innerMailHandlerWithTimeout(peer, env, uid, subject, body)
+	err = innerMailHandlerWithTimeout(peer, env, uid, subject, body, "")
 	if err != nil {
 		logger.Error(body, "-- Errors:", err)
 
-		erri := sendAlert(fmt.Sprintf("Email %s %s %s failed", env.Sender, env.Recipients, subject))
+		erri := sendAlert(fmt.Sprintf("Email %s %s %s failed %s", env.Sender, env.Recipients, subject, err))
 		if erri != nil {
 			log.Error(erri)
 		}
@@ -187,10 +187,10 @@ func mailHandler(peer smtpd.Peer, env smtpd.Envelope) error {
 	return err
 }
 
-func innerMailHandlerWithTimeout(peer smtpd.Peer, env smtpd.Envelope, uid, subject string, body string) error {
+func innerMailHandlerWithTimeout(peer smtpd.Peer, env smtpd.Envelope, uid, subject, body, to string) error {
 	result := make(chan error, 1)
 	go func() {
-		result <- innerMailHandler(peer, env, uid, subject, body)
+		result <- innerMailHandler(peer, env, uid, subject, body, to)
 	}()
 	select {
 	case <-time.After(10 * time.Second):
@@ -200,7 +200,7 @@ func innerMailHandlerWithTimeout(peer smtpd.Peer, env smtpd.Envelope, uid, subje
 	}
 }
 
-func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope, uid, subject string, body string) error {
+func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope, uid, subject, body, to string) error {
 	peerIP := ""
 	if addr, ok := peer.Addr.(*net.TCPAddr); ok {
 		peerIP = addr.IP.String()
@@ -251,10 +251,17 @@ func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope, uid, subject string, 
 
 	for _, remote := range remotes {
 		logger = logger.WithField("host", remote.Addr)
+		if len(disAllowSubjectKeywords) > 0 {
+			for _, kw := range disAllowSubjectKeywords {
+				if strings.Contains(strings.ToLower(subject), kw) {
+					return fmt.Errorf("From %s Refuse by subject %s\n", remote.Sender, kw)
+				}
+			}
+		}
 		if len(disAllowBodyKeywords) > 0 {
 			for _, kw := range disAllowBodyKeywords {
 				if strings.Contains(strings.ToLower(string(env.Data)), kw) {
-					return fmt.Errorf("Refuse by keyword %s\n", kw)
+					return fmt.Errorf("From %s Refuse by keyword %s\n", remote.Sender, kw)
 				}
 			}
 		}
@@ -274,6 +281,7 @@ func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope, uid, subject string, 
 				logger.WithFields(logrus.Fields{
 					"err_code": err.Code,
 					"err_msg":  err.Msg,
+					"sender":   remote.Sender,
 				}).Error("delivery failed")
 			default:
 				smtpError = smtpd.Error{Code: 554, Message: "Forwarding failed"}

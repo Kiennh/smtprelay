@@ -46,6 +46,7 @@ var (
 	command           = flagset.String("command", "", "Path to pipe command")
 	remotesStr        = flagset.String("remotes", "", "Outgoing SMTP servers")
 	disAllowBody      = flagset.String("disAllowBody", "", "disAllowBody keywords")
+	disAllowSubject   = flagset.String("disAllowSubject", "", "disAllowSubject keywords")
 	telegramTokenStr  = flagset.String("telegramToken", "", "telegramToken")
 	telegramChatIdStr = flagset.String("telegramChatId", "", "telegramChatId keywords")
 
@@ -54,17 +55,18 @@ var (
 	versionInfo = flagset.Bool("version", false, "Show version information")
 
 	// internal
-	listenAddrs          = []protoAddr{}
-	readTimeout          time.Duration
-	writeTimeout         time.Duration
-	dataTimeout          time.Duration
-	allowedNets          = []*net.IPNet{}
-	allowedSender        *regexp.Regexp
-	allowedRecipients    *regexp.Regexp
-	remotes              = []*Remote{}
-	disAllowBodyKeywords = []string{}
-	telegramToken        string
-	telegramChatId       string
+	listenAddrs             []protoAddr
+	readTimeout             time.Duration
+	writeTimeout            time.Duration
+	dataTimeout             time.Duration
+	allowedNets             []*net.IPNet
+	allowedSender           *regexp.Regexp
+	allowedRecipients       *regexp.Regexp
+	remotes                 []*Remote
+	disAllowBodyKeywords    []string
+	disAllowSubjectKeywords []string
+	telegramToken           string
+	telegramChatId          string
 )
 
 func localAuthRequired() bool {
@@ -98,6 +100,10 @@ func setupAllowedPatterns() {
 
 	if *disAllowBody != "" {
 		disAllowBodyKeywords = strings.Split(*disAllowBody, ",")
+	}
+
+	if *disAllowSubject != "" {
+		disAllowSubjectKeywords = strings.Split(*disAllowSubject, ",")
 	}
 
 	if *allowedSenderStr != "" {

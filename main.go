@@ -313,13 +313,11 @@ func getRemotes() []*Remote {
 		index[i] = i
 	}
 	if len(remotes) > 1 && shuffle {
-		rand.Shuffle(len(remotes)/2, func(i, j int) {
+		rand.Shuffle(len(remotes), func(i, j int) {
 			index[i], index[j] = index[j], index[i]
 		})
 	}
-	log.Println("shuffe")
 	for i, _ := range remotes {
-		log.Println(i, "  ", index[i])
 		r[i] = remotes[index[i]]
 	}
 	return remotes

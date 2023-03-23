@@ -320,7 +320,7 @@ func getRemotes() []*Remote {
 	for i, _ := range remotes {
 		r[i] = remotes[index[i]]
 	}
-	return remotes
+	return r
 }
 
 func generateUUID() string {

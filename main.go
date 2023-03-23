@@ -249,13 +249,8 @@ func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope, uid, subject, body, t
 	}
 
 	var errAll error
-	if len(remotes) > 1 && shuffle {
-		rand.Shuffle(len(remotes), func(i, j int) {
-			remotes[i], remotes[j] = remotes[j], remotes[i]
-		})
-	}
 
-	for _, remote := range remotes {
+	for _, remote := range getRemotes() {
 		logger = logger.WithField("host", remote.Addr)
 		if len(disAllowSubjectKeywords) > 0 {
 			for _, kw := range disAllowSubjectKeywords {
@@ -309,6 +304,25 @@ func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope, uid, subject, body, t
 	}
 
 	return errAll
+}
+
+func getRemotes() []*Remote {
+	r := make([]*Remote, len(remotes))
+	index := make([]int, len(remotes))
+	for i, _ := range remotes {
+		index[i] = i
+	}
+	if len(remotes) > 1 && shuffle {
+		rand.Shuffle(len(remotes)/2, func(i, j int) {
+			index[i], index[j] = index[j], index[i]
+		})
+	}
+	log.Println("shuffe")
+	for i, _ := range remotes {
+		log.Println(i, "  ", index[i])
+		r[i] = remotes[index[i]]
+	}
+	return remotes
 }
 
 func generateUUID() string {

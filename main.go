@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"math/rand"
 	"net"
 	"net/textproto"
 	"os"
@@ -248,6 +249,11 @@ func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope, uid, subject, body, t
 	}
 
 	var errAll error
+	if len(remotes) > 1 && shuffle {
+		rand.Shuffle(len(remotes), func(i, j int) {
+			remotes[i], remotes[j] = remotes[j], remotes[i]
+		})
+	}
 
 	for _, remote := range remotes {
 		logger = logger.WithField("host", remote.Addr)

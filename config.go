@@ -49,6 +49,7 @@ var (
 	disAllowSubject   = flagset.String("disAllowSubject", "", "disAllowSubject keywords")
 	telegramTokenStr  = flagset.String("telegramToken", "", "telegramToken")
 	telegramChatIdStr = flagset.String("telegramChatId", "", "telegramChatId keywords")
+	shuffleRemote     = flagset.Int("shuffle", 1, "shuffle the remotes")
 
 	// additional flags
 	_           = flagset.String("config", "", "Path to config file (ini format)")
@@ -67,6 +68,7 @@ var (
 	disAllowSubjectKeywords []string
 	telegramToken           string
 	telegramChatId          string
+	shuffle                 bool
 )
 
 func localAuthRequired() bool {
@@ -251,6 +253,9 @@ func ConfigLoad() {
 		telegramChatId = *telegramChatIdStr
 	}
 
+	if *shuffleRemote == 1 {
+		shuffle = true
+	}
 	setupAllowedNetworks()
 	setupAllowedPatterns()
 	setupRemotes()

@@ -14,6 +14,7 @@ type Remote struct {
 	Port       string
 	Addr       string
 	Sender     string
+	Name       string
 }
 
 // ParseRemote creates a remote from a given url in the following format:
@@ -77,6 +78,10 @@ func ParseRemote(remoteURL string) (*Remote, error) {
 
 	if u.Path != "" {
 		r.Sender = u.Path[1:]
+	}
+
+	if u.Query().Has("name") {
+		r.Name = u.Query().Get("name")
 	}
 
 	return r, nil

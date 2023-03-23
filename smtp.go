@@ -327,6 +327,9 @@ func SendMail(r *Remote, from string, to []string, msg []byte) error {
 	}
 	var re = regexp.MustCompile(`From:(.*)<(.*)>`)
 	s := re.ReplaceAllString(string(msg), fmt.Sprintf("From: $1 <%s>", from))
+	if r.Name != "" {
+		s = re.ReplaceAllString(s, fmt.Sprintf("From: %s <$2>", r.Name))
+	}
 	msg = []byte(s)
 
 	if err := validateLine(from); err != nil {

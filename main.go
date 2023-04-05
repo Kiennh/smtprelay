@@ -250,7 +250,7 @@ func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope, uid, subject, body, t
 
 	var errAll error
 
-	for _, remote := range getRemotes() {
+	for _, remote := range getRemotes(env.Sender) {
 		logger = logger.WithField("host", remote.Addr)
 		if len(disAllowSubjectKeywords) > 0 {
 			for _, kw := range disAllowSubjectKeywords {
@@ -306,19 +306,29 @@ func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope, uid, subject, body, t
 	return errAll
 }
 
-func getRemotes() []*Remote {
-	r := make([]*Remote, len(remotes))
-	index := make([]int, len(remotes))
-	for i, _ := range remotes {
+func getRemotes(from string) []*Remote {
+	var innerRemotes []*Remote
+	for _, r := range remotes {
+		if strings.ToLower(r.Name) != strings.ToLower(from) && !matchSender {
+			innerRemotes = append(innerRemotes, r)
+		}
+
+		if strings.ToLower(r.Name) == strings.ToLower(from) {
+			innerRemotes = append(innerRemotes, r)
+		}
+	}
+	r := make([]*Remote, len(innerRemotes))
+	index := make([]int, len(innerRemotes))
+	for i, _ := range innerRemotes {
 		index[i] = i
 	}
-	if len(remotes) > 1 && shuffle {
-		rand.Shuffle(len(remotes), func(i, j int) {
+	if len(innerRemotes) > 1 && shuffle {
+		rand.Shuffle(len(innerRemotes), func(i, j int) {
 			index[i], index[j] = index[j], index[i]
 		})
 	}
-	for i, _ := range remotes {
-		r[i] = remotes[index[i]]
+	for i, _ := range innerRemotes {
+		r[i] = innerRemotes[index[i]]
 	}
 	return r
 }

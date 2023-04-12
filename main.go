@@ -248,9 +248,14 @@ func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope, uid, subject, body, t
 		cmdLogger.Info("pipe command successful: " + stdout.String())
 	}
 
-	var errAll error
-
-	for _, remote := range getRemotes(env.Sender) {
+	errAll := fmt.Errorf("Email not send\n")
+	from := ""
+	var regexToFindFrom = regexp.MustCompile(`From:(.*)<(.*)>`)
+	sendFroms := regexToFindFrom.FindStringSubmatch(string(env.Data))
+	if len(sendFroms) == 3 {
+		from = sendFroms[2]
+	}
+	for _, remote := range getRemotes(from) {
 		logger = logger.WithField("host", remote.Addr)
 		if len(disAllowSubjectKeywords) > 0 {
 			for _, kw := range disAllowSubjectKeywords {
@@ -300,6 +305,7 @@ func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope, uid, subject, body, t
 			logger.Error(erri)
 		}
 		logger.Info(body)
+		errAll = nil
 		break
 	}
 
@@ -307,6 +313,7 @@ func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope, uid, subject, body, t
 }
 
 func getRemotes(from string) []*Remote {
+	log.Info("GetRemotes ", from, " ", matchSender)
 	var innerRemotes []*Remote
 	for _, r := range remotes {
 		if strings.ToLower(r.Name) != strings.ToLower(from) && !matchSender {
@@ -317,6 +324,7 @@ func getRemotes(from string) []*Remote {
 			innerRemotes = append(innerRemotes, r)
 		}
 	}
+	log.Info("GetRemotes ", from, " ", matchSender, " ", len(innerRemotes))
 	r := make([]*Remote, len(innerRemotes))
 	index := make([]int, len(innerRemotes))
 	for i, _ := range innerRemotes {

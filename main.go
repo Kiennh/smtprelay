@@ -249,11 +249,19 @@ func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope, uid, subject, body, t
 	}
 
 	errAll := fmt.Errorf("Email not send\n")
-	from := ""
+	from := env.Sender
 	var regexToFindFrom = regexp.MustCompile(`From:(.*)<(.*)>`)
-	sendFroms := regexToFindFrom.FindStringSubmatch(string(env.Data))
-	if len(sendFroms) == 3 {
-		from = sendFroms[2]
+	if regexToFindFrom.Match(env.Data) {
+		sendFroms := regexToFindFrom.FindStringSubmatch(string(env.Data))
+		if len(sendFroms) == 3 {
+			from = sendFroms[2]
+		}
+	} else {
+		re2 := regexp.MustCompile(`From:(.*)\nTo:`)
+		sendFroms := re2.FindStringSubmatch(string(env.Data))
+		if len(sendFroms) == 2 {
+			from = sendFroms[1]
+		}
 	}
 	for _, remote := range getRemotes(from) {
 		logger = logger.WithField("host", remote.Addr)

@@ -254,13 +254,13 @@ func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope, uid, subject, body, t
 	if regexToFindFrom.Match(env.Data) {
 		sendFroms := regexToFindFrom.FindStringSubmatch(string(env.Data))
 		if len(sendFroms) == 3 {
-			from = sendFroms[2]
+			from = strings.Trim(sendFroms[2], " \n\t\r")
 		}
 	} else {
 		re2 := regexp.MustCompile(`From:(.*)\nTo:`)
 		sendFroms := re2.FindStringSubmatch(string(env.Data))
 		if len(sendFroms) == 2 {
-			from = sendFroms[1]
+			from = strings.Trim(sendFroms[1], " \n\t\r")
 		}
 	}
 	for _, remote := range getRemotes(from) {
@@ -321,18 +321,16 @@ func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope, uid, subject, body, t
 }
 
 func getRemotes(from string) []*Remote {
-	log.Info("GetRemotes ", from, " ", matchSender)
 	var innerRemotes []*Remote
 	for _, r := range remotes {
-		if strings.ToLower(r.Name) != strings.ToLower(from) && !matchSender {
+		if r.Sender == "" || (strings.ToLower(r.Sender) != strings.ToLower(from) && !matchSender) {
 			innerRemotes = append(innerRemotes, r)
 		}
 
-		if strings.ToLower(r.Name) == strings.ToLower(from) {
+		if strings.ToLower(r.Sender) == strings.ToLower(from) {
 			innerRemotes = append(innerRemotes, r)
 		}
 	}
-	log.Info("GetRemotes ", from, " ", matchSender, " ", len(innerRemotes))
 	r := make([]*Remote, len(innerRemotes))
 	index := make([]int, len(innerRemotes))
 	for i, _ := range innerRemotes {

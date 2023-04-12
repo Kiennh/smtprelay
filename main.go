@@ -263,7 +263,11 @@ func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope, uid, subject, body, t
 			from = strings.Trim(sendFroms[1], " \n\t\r")
 		}
 	}
-	for _, remote := range getRemotes(from) {
+	filteredRemotes := getRemotes(from)
+	if len(filteredRemotes) == 0 {
+		return fmt.Errorf("No remote found for %s\n", from)
+	}
+	for _, remote := range filteredRemotes {
 		logger = logger.WithField("host", remote.Addr)
 		if len(disAllowSubjectKeywords) > 0 {
 			for _, kw := range disAllowSubjectKeywords {
@@ -344,6 +348,7 @@ func getRemotes(from string) []*Remote {
 	for i, _ := range innerRemotes {
 		r[i] = innerRemotes[index[i]]
 	}
+
 	return r
 }
 

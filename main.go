@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/decke/smtprelay/smtpd"
 	"math/rand"
 	"net"
 	"net/textproto"
@@ -17,7 +18,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/chrj/smtpd"
+
 	"github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/google/uuid"
 	"github.com/jhillyerd/enmime"
@@ -399,7 +400,7 @@ func getTLSConfig() *tls.Config {
 
 	return &tls.Config{
 		PreferServerCipherSuites: true,
-		MinVersion:               tls.VersionTLS12,
+		MinVersion:               tls.VersionTLS10,
 		CipherSuites:             tlsCipherSuites,
 		Certificates:             []tls.Certificate{cert},
 	}

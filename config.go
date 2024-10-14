@@ -51,7 +51,6 @@ var (
 	telegramChatIdStr = flagset.String("telegramChatId", "", "telegramChatId keywords")
 	shuffleRemote     = flagset.Int("shuffle", 1, "shuffle the remotes")
 	matchSenderMode   = flagset.Int("matchSender", 1, "match the sender with remote")
-	forceBcc          = flagset.String("bcc", "", "append bcc when sent mail")
 	// additional flags
 	_           = flagset.String("config", "", "Path to config file (ini format)")
 	versionInfo = flagset.Bool("version", false, "Show version information")

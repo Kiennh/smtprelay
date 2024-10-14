@@ -149,8 +149,6 @@ func (session *session) handleHELO(cmd command) {
 	session.peer.Protocol = SMTP
 	session.reply(250, "Go ahead")
 
-	return
-
 }
 
 func (session *session) handleEHLO(cmd command) {
@@ -187,9 +185,6 @@ func (session *session) handleEHLO(cmd command) {
 	}
 
 	session.reply(250, extensions[len(extensions)-1])
-
-	return
-
 }
 
 func (session *session) handleMAIL(cmd command) {
@@ -244,9 +239,6 @@ func (session *session) handleMAIL(cmd command) {
 	}
 
 	session.reply(250, "Go ahead")
-
-	return
-
 }
 
 func (session *session) handleRCPT(cmd command) {
@@ -283,9 +275,6 @@ func (session *session) handleRCPT(cmd command) {
 	session.envelope.Recipients = append(session.envelope.Recipients, addr)
 
 	session.reply(250, "Go ahead")
-
-	return
-
 }
 
 func (session *session) handleSTARTTLS(cmd command) {
@@ -329,12 +318,9 @@ func (session *session) handleSTARTTLS(cmd command) {
 
 	// Flush the connection to set new timeout deadlines
 	session.flush()
-
-	return
-
 }
 
-func (session *session) handleDATA(cmd command) {
+func (session *session) handleDATA(_ command) {
 
 	if session.envelope == nil || len(session.envelope.Recipients) == 0 {
 		session.reply(502, "Missing RCPT TO command.")
@@ -385,26 +371,20 @@ func (session *session) handleDATA(cmd command) {
 	))
 
 	session.reset()
-
-	return
-
 }
 
-func (session *session) handleRSET(cmd command) {
+func (session *session) handleRSET(_ command) {
 	session.reset()
 	session.reply(250, "Go ahead")
-	return
 }
 
-func (session *session) handleNOOP(cmd command) {
+func (session *session) handleNOOP(_ command) {
 	session.reply(250, "Go ahead")
-	return
 }
 
-func (session *session) handleQUIT(cmd command) {
+func (session *session) handleQUIT(_ command) {
 	session.reply(221, "OK, bye")
 	session.close()
-	return
 }
 
 func (session *session) handleAUTH(cmd command) {

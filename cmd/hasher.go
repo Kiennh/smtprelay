@@ -16,7 +16,7 @@ func main() {
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Error generating hash: %s", err)
+		fmt.Fprintln(os.Stderr, "ERROR GENERATE HASH: %s", err)
 	}
 	fmt.Println(string(hash))
 }

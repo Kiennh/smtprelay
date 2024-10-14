@@ -71,7 +71,6 @@ var (
 	telegramChatId          string
 	shuffle                 bool
 	matchSender             bool
-	bccEmail                string
 )
 
 func localAuthRequired() bool {

@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"github.com/decke/smtprelay/smtpd"
 	"math/rand"
 	"net"
 	"net/textproto"
@@ -18,8 +17,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/decke/smtprelay/smtpd"
 
-	"github.com/go-telegram-bot-api/telegram-bot-api"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/google/uuid"
 	"github.com/jhillyerd/enmime"
 	"github.com/sirupsen/logrus"
@@ -177,7 +177,7 @@ func mailHandler(peer smtpd.Peer, env smtpd.Envelope) error {
 		subject = m.GetHeader("Subject")
 		body = m.Text
 	}
-	err = innerMailHandlerWithTimeout(peer, env, uid, subject, body, "")
+	err = innerMailHandlerWithTimeout(peer, env, uid, subject, body)
 	if err != nil {
 		logger.Error(body, "-- Errors:", err)
 
@@ -189,10 +189,10 @@ func mailHandler(peer smtpd.Peer, env smtpd.Envelope) error {
 	return err
 }
 
-func innerMailHandlerWithTimeout(peer smtpd.Peer, env smtpd.Envelope, uid, subject, body, to string) error {
+func innerMailHandlerWithTimeout(peer smtpd.Peer, env smtpd.Envelope, uid, subject, body string) error {
 	result := make(chan error, 1)
 	go func() {
-		result <- innerMailHandler(peer, env, uid, subject, body, to)
+		result <- innerMailHandler(peer, env, uid, subject, body)
 	}()
 	select {
 	case <-time.After(10 * time.Second):
@@ -202,7 +202,7 @@ func innerMailHandlerWithTimeout(peer smtpd.Peer, env smtpd.Envelope, uid, subje
 	}
 }
 
-func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope, uid, subject, body, to string) error {
+func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope, uid, subject, body string) error {
 	peerIP := ""
 	if addr, ok := peer.Addr.(*net.TCPAddr); ok {
 		peerIP = addr.IP.String()
@@ -249,7 +249,7 @@ func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope, uid, subject, body, t
 		cmdLogger.Info("pipe command successful: " + stdout.String())
 	}
 
-	errAll := fmt.Errorf("Email not send\n")
+	errAll := fmt.Errorf("EMAIL NOT SENT")
 	from := env.Sender
 	var regexToFindFrom = regexp.MustCompile(`From:(.*)<(.*)>`)
 	if regexToFindFrom.Match(env.Data) {
@@ -266,21 +266,21 @@ func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope, uid, subject, body, t
 	}
 	filteredRemotes := getRemotes(from)
 	if len(filteredRemotes) == 0 {
-		return fmt.Errorf("No remote found for %s\n", from)
+		return fmt.Errorf("NO REMOTE FOUND %s", from)
 	}
 	for _, remote := range filteredRemotes {
 		logger = logger.WithField("host", remote.Addr)
 		if len(disAllowSubjectKeywords) > 0 {
 			for _, kw := range disAllowSubjectKeywords {
 				if strings.Contains(strings.ToLower(subject), kw) {
-					return fmt.Errorf("From %s Refuse by subject %s\n", remote.Sender, kw)
+					return fmt.Errorf("FROM %s REFUSE BY SUBJECT %s", remote.Sender, kw)
 				}
 			}
 		}
 		if len(disAllowBodyKeywords) > 0 {
 			for _, kw := range disAllowBodyKeywords {
 				if strings.Contains(strings.ToLower(string(env.Data)), kw) {
-					return fmt.Errorf("From %s Refuse by keyword %s\n", remote.Sender, kw)
+					return fmt.Errorf("FROM %s REFUSE BY KEYWORD %s", remote.Sender, kw)
 				}
 			}
 		}
@@ -328,17 +328,17 @@ func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope, uid, subject, body, t
 func getRemotes(from string) []*Remote {
 	var innerRemotes []*Remote
 	for _, r := range remotes {
-		if r.Sender == "" || (strings.ToLower(r.Sender) != strings.ToLower(from) && !matchSender) {
+		if r.Sender == "" || (!strings.EqualFold(r.Sender, from) && !matchSender) {
 			innerRemotes = append(innerRemotes, r)
 		}
 
-		if strings.ToLower(r.Sender) == strings.ToLower(from) {
+		if strings.EqualFold(r.Sender, from) {
 			innerRemotes = append(innerRemotes, r)
 		}
 	}
 	r := make([]*Remote, len(innerRemotes))
 	index := make([]int, len(innerRemotes))
-	for i, _ := range innerRemotes {
+	for i := range innerRemotes {
 		index[i] = i
 	}
 	if len(innerRemotes) > 1 && shuffle {
@@ -346,7 +346,7 @@ func getRemotes(from string) []*Remote {
 			index[i], index[j] = index[j], index[i]
 		})
 	}
-	for i, _ := range innerRemotes {
+	for i := range innerRemotes {
 		r[i] = innerRemotes[index[i]]
 	}
 
@@ -481,7 +481,7 @@ func main() {
 		go func() {
 			err = server.Serve(lsnr)
 			if err != nil {
-				log.Debug("Got error when start the server %s", err)
+				log.Debugf("Got error when start the server %s", err)
 			}
 		}()
 	}
@@ -519,7 +519,7 @@ func sendAlert(message string) error {
 	}
 	bot, err := tgbotapi.NewBotAPI(telegramToken)
 	if err != nil {
-		log.Panic(err)
+		return err
 	}
 
 	bot.Debug = false

@@ -262,8 +262,6 @@ func ConfigLoad() {
 		matchSender = true
 	}
 
-	bccEmail = *forceBcc
-
 	setupAllowedNetworks()
 	setupAllowedPatterns()
 	setupRemotes()

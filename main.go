@@ -313,10 +313,6 @@ func innerMailHandler(peer smtpd.Peer, env smtpd.Envelope, uid, subject, body st
 			continue
 		}
 
-		erri := sendAlert(fmt.Sprintf("Sending mail %s %s %s", env.Sender, env.Recipients, subject))
-		if erri != nil {
-			logger.Error(erri)
-		}
 		logger.Info(body)
 		errAll = nil
 		break
